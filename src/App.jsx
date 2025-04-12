@@ -17,10 +17,14 @@ import Contact from "./Components/Contact";
 import OrderedProductpreviewadmin from "./Components/OrderedProductpreviewadmin";
 import Cart from "./Components/Cart";
 import Login from "./Components/Login";
+import XeroxOrderpreviewtempadmin from "./Components/XeroxOrderpreviewtempadmin";
 import EditProfile from "./Components/EditProfile";
 import Signup from "./Components/Signup";
+import OrdersControlatempadmin from "./Components/OrdersControlatempadmin";
 import Success from "./Components/Succes";
 import ProductView from "./Components/ProductView";
+import XeroxOrdertempadmin from "./Components/XeroxOrdertempadmin";
+import OrdersControldmin from "./Components/OrdersControldmin";
 import Admin from "./Components/Admin";
 import Orders from "./Components/Orders";
 
@@ -74,11 +78,7 @@ function Navbar({ user, profileImageUrl }) {
   useEffect(() => {
     closeMenu();
   }, [location.pathname]);
-
-  if (!user || ["/login", "/signup", "/admin", "/tempadmin"].includes(location.pathname)) {
-    return null;
-  }
-
+  
   const getActiveClass = (path) => (location.pathname === path ? "active" : "");
 
   return (
@@ -97,45 +97,39 @@ function Navbar({ user, profileImageUrl }) {
               </button>
             </div>
             
-            
-
-            
             <div className="nav-actions">
-
-            <ul className="nav-links">
-              <li>
-                <Link to="/home" className={getActiveClass("/home")}>
-                  <i className="bx bx-home-alt"></i>
-                  <span>Home</span>
-                </Link>
-              </li>
-              <li>
-                <Link to="/shop" className={getActiveClass("/shop")}>
-                  <i className="bx bx-store"></i>
-                  <span>Shop</span>
-                </Link>
-              </li>
-              <li>
-                <Link to="/xerox" className={getActiveClass("/xerox")}>
-                  <i className="bx bx-copy"></i>
-                  <span>Xerox</span>
-                </Link>
-              </li>
-            </ul>
+              <ul className="nav-links">
+                <li>
+                  <Link to="/home" className={getActiveClass("/home")}>
+                    <i className="bx bx-home-alt"></i>
+                    <span>Home</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/shop" className={getActiveClass("/shop")}>
+                    <i className="bx bx-store"></i>
+                    <span>Shop</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/xerox" className={getActiveClass("/xerox")}>
+                    <i className="bx bx-copy"></i>
+                    <span>Xerox</span>
+                  </Link>
+                </li>
+              </ul>
               <div className="cart-pro">
                 <Link to="/cart" className={`cart-icon ${getActiveClass("/cart")}`}>
                   <i className="bx bx-shopping-bag"></i>
                 </Link>
                 
-                {user && (
-                  <Link to="/profile" className={`profile-link ${getActiveClass("/profile")}`}>
-                    <img
-                      src={profileImageUrl || "person3.jpg"}
-                      alt="Profile"
-                      className="profile-image"
-                    />
-                  </Link>
-                )}
+                <Link to="/profile" className={`profile-link ${getActiveClass("/profile")}`}>
+                  <img
+                    src={profileImageUrl || "person3.jpg"}
+                    alt="Profile"
+                    className="profile-image"
+                  />
+                </Link>
               </div>
             </div>
           </nav>
@@ -161,47 +155,12 @@ function App() {
   const [profileImageUrl, setProfileImageUrl] = useState(null);
   const [userRole, setUserRole] = useState("user"); // Default role
   const [loading, setLoading] = useState(true);
+  const [tempAdmins, setTempAdmins] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
 
   // Hardcoded admin emails
   const admins = ["saleem1712005@gmail.com", "jayaraman00143@gmail.com", "abcd1234@gmail.com"];
-  const [tempAdmins, setTempAdmins] = useState([]);
-
-  // Fetch temp admins from Firebase
-  useEffect(() => {
-    const tempAdminsRef = ref(database, "tempadmin1");
-    
-    const fetchTempAdmins = onValue(tempAdminsRef, (snapshot) => {
-      const tempAdminsList = [];
-      if (snapshot.exists()) {
-        snapshot.forEach((childSnapshot) => {
-          const tempAdminEmail = childSnapshot.child("email").val();
-          if (tempAdminEmail) {
-            tempAdminsList.push(tempAdminEmail);
-          }
-        });
-      }
-      setTempAdmins(tempAdminsList);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching temp admins:", error);
-      setLoading(false);
-    });
-    
-    return () => fetchTempAdmins();
-  }, []);
-
-  // Determine user role based on email
-  const determineUserRole = (email) => {
-    if (admins.includes(email)) {
-      return "admin";
-    } else if (tempAdmins.includes(email)) {
-      return "tempadmin";
-    } else {
-      return "user";
-    }
-  };
 
   // Fetch user profile data including profile image URL
   const fetchUserProfile = (userId) => {
@@ -221,6 +180,46 @@ function App() {
     });
   };
 
+  // Fetch current temp admins from Firebase
+  const fetchTempAdmins = () => {
+    const tempAdminsRef = ref(database, "tempadmin");
+    
+    onValue(tempAdminsRef, (snapshot) => {
+      const tempAdminsList = [];
+      if (snapshot.exists()) {
+        snapshot.forEach((childSnapshot) => {
+          const tempAdminEmail = childSnapshot.child("email").val();
+          if (tempAdminEmail) {
+            tempAdminsList.push(tempAdminEmail.toLowerCase());
+          }
+        });
+      }
+      setTempAdmins(tempAdminsList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching temp admins:", error);
+      setLoading(false);
+    });
+  };
+
+  // Fetch temp admins on initial load
+  useEffect(() => {
+    fetchTempAdmins();
+  }, []);
+
+  // Determine user role based on email
+  const determineUserRole = (email) => {
+    const lowerEmail = email.toLowerCase();
+    if (admins.includes(lowerEmail)) {
+      return "admin";
+    } else if (tempAdmins.includes(lowerEmail)) {
+      return "tempadmin";
+    } else {
+      return "user";
+    }
+  };
+
+  // Auth state listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       if (currentUser) {
@@ -231,18 +230,42 @@ function App() {
         // Fetch the user's profile data including profile image
         fetchUserProfile(currentUser.uid);
         
-        // Determine user role and set it
-        const role = determineUserRole(currentUser.email);
-        setUserRole(role);
-        localStorage.setItem("userRole", role);
+        // Always fetch the latest temp admin list when determining role
+        const tempAdminsRef = ref(database, "tempadmin");
         
-        if (location.pathname === "/login" || location.pathname === "/signup") {
-          const routeToNavigate = 
-            role === "admin" ? "/admin" :
-            role === "tempadmin" ? "/tempadmin" : 
-            "/home";
-          navigate(routeToNavigate);
-        }
+        onValue(tempAdminsRef, (snapshot) => {
+          const tempAdminsList = [];
+          if (snapshot.exists()) {
+            snapshot.forEach((childSnapshot) => {
+              const tempAdminEmail = childSnapshot.child("email").val();
+              if (tempAdminEmail) {
+                tempAdminsList.push(tempAdminEmail.toLowerCase());
+              }
+            });
+          }
+          
+          setTempAdmins(tempAdminsList);
+          
+          // Use the fresh temp admin list to determine role
+          const lowerEmail = currentUser.email.toLowerCase();
+          const role = admins.includes(lowerEmail) 
+            ? "admin" 
+            : tempAdminsList.includes(lowerEmail)
+              ? "tempadmin"
+              : "user";
+              
+          setUserRole(role);
+          localStorage.setItem("userRole", role);
+          
+          // Correctly route users based on their role
+          if (location.pathname === "/login" || location.pathname === "/signup") {
+            const routeToNavigate = 
+              role === "admin" ? "/admin" :
+              role === "tempadmin" ? "/tempadmin" : 
+              "/home";
+            navigate(routeToNavigate);
+          }
+        });
       } else {
         setUser(null);
         setProfileImageUrl(null);
@@ -258,39 +281,96 @@ function App() {
     });
 
     return () => unsubscribe();
-  }, [navigate, location.pathname, tempAdmins]);
+  }, [navigate, location.pathname]);
 
-  // Check for stored user data on initial load
+  // Check for stored user data on initial load - FIXED VERSION
   useEffect(() => {
     const storedEmail = localStorage.getItem("userEmail");
     const storedUserId = localStorage.getItem("userId");
     const storedRole = localStorage.getItem("userRole");
-
+    
     if (storedEmail && storedUserId) {
       setUser({ email: storedEmail, uid: storedUserId });
       
       // Fetch profile image
       fetchUserProfile(storedUserId);
       
-      // Set user role from localStorage or determine it
-      if (storedRole) {
-        setUserRole(storedRole);
-      } else {
-        const role = determineUserRole(storedEmail);
+      // Always fetch the latest temp admin list to determine current role
+      const tempAdminsRef = ref(database, "tempadmin");
+      
+      onValue(tempAdminsRef, (snapshot) => {
+        const tempAdminsList = [];
+        if (snapshot.exists()) {
+          snapshot.forEach((childSnapshot) => {
+            const tempAdminEmail = childSnapshot.child("email").val();
+            if (tempAdminEmail) {
+              tempAdminsList.push(tempAdminEmail.toLowerCase());
+            }
+          });
+        }
+        
+        setTempAdmins(tempAdminsList);
+        
+        // Use the fresh temp admin list to determine role
+        const lowerEmail = storedEmail.toLowerCase();
+        const role = admins.includes(lowerEmail) 
+          ? "admin" 
+          : tempAdminsList.includes(lowerEmail)
+            ? "tempadmin"
+            : "user";
+            
         setUserRole(role);
         localStorage.setItem("userRole", role);
-      }
-      
-      // Navigate to appropriate page if we're on login/signup
-      if (location.pathname === "/login" || location.pathname === "/signup") {
-        const routeToNavigate = 
-          storedRole === "admin" ? "/admin" :
-          storedRole === "tempadmin" ? "/tempadmin" : 
-          "/home";
-        navigate(routeToNavigate);
+        
+        // Critical fix: navigate based on role when the app first loads
+        if (!["/login", "/signup"].includes(location.pathname)) {
+          // Don't redirect if we're on login or signup
+          
+          // Check if user is on the correct dashboard based on their role
+          const isAdminOnAdminRoute = role === "admin" && location.pathname.startsWith("/admin");
+          const isTempAdminOnTempRoute = role === "tempadmin" && location.pathname.startsWith("/tempadmin");
+          const isUserOnUserRoute = role === "user" && !["/admin", "/tempadmin"].some(prefix => location.pathname.startsWith(prefix));
+          
+          // If not on the correct route for their role, redirect them
+          if (!isAdminOnAdminRoute && !isTempAdminOnTempRoute && !isUserOnUserRoute) {
+            const routeToNavigate = 
+              role === "admin" ? "/admin" :
+              role === "tempadmin" ? "/tempadmin" : 
+              "/home";
+            navigate(routeToNavigate);
+          }
+        }
+        
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+      // No user data in localStorage, ensure we're on login/signup
+      if (!["/login", "/signup"].includes(location.pathname)) {
+        navigate("/login");
       }
     }
-  }, [navigate, tempAdmins]);
+  }, [navigate, location.pathname]);
+
+  // Function to check if the current route should show navbar
+  const shouldShowNavbar = () => {
+    // Only show navbar for regular users (not admin/tempadmin)
+    if (userRole !== "user") {
+      return false;
+    }
+    
+    // Don't show navbar on login/signup pages
+    if (["/login", "/signup"].includes(location.pathname)) {
+      return false;
+    }
+    
+    // Don't show navbar on admin/tempadmin routes
+    if (location.pathname.startsWith("/admin") || location.pathname.startsWith("/tempadmin")) {
+      return false;
+    }
+    
+    return true;
+  };
 
   if (loading) {
     return <div className="loading-container">
@@ -301,20 +381,33 @@ function App() {
 
   return (
     <>
-      {user && 
-       userRole === "user" && 
-       !["/login", "/signup"].includes(location.pathname) && (
+      {/* Only show navbar for regular users on appropriate routes */}
+      {user && shouldShowNavbar() && (
         <Navbar user={user} profileImageUrl={profileImageUrl} />
       )}
 
       <Routes>
-        <Route path="/" element={user ? <Home /> : <Login />} />
+        <Route 
+          path="/" 
+          element={user ? (
+            userRole === "admin" ? <Navigate to="/admin" /> : 
+            userRole === "tempadmin" ? <Navigate to="/tempadmin" /> : 
+            <Home />
+          ) : <Login />} 
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/product" element={<ProductView />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/order-detail/:id" element={<OrderDetail />} />
-        <Route path="/home" element={user ? <Home /> : <Login />} />
+        <Route 
+          path="/home" 
+          element={user ? (
+            userRole === "admin" ? <Navigate to="/admin" /> : 
+            userRole === "tempadmin" ? <Navigate to="/tempadmin" /> : 
+            <Home />
+          ) : <Login />} 
+        />
         <Route path="/shop" element={user ? <Shop /> : <Login />} />
         <Route path="/success" element={user ? <Success /> : <Login />} />
         <Route path="/edit-profile" element={user ? <EditProfile /> : <Login />} />
@@ -339,8 +432,8 @@ function App() {
           <Route path="orders" element={<Orders />} />
           <Route path="OrderedProductpreviewadmin/:userId/:orderId" element={<OrderedProductpreviewadmin />} />
           <Route path="tempadmincontrol" element={<Tempadmincontrol />} />
-          <Route path="about" element={<About />} />
-          <Route path="contact" element={<Contact />} />
+          <Route path="OrdersControldmin" element={<OrdersControldmin />} />
+          
         </Route>
 
         {/* Temp Admin Routes */}
@@ -348,9 +441,10 @@ function App() {
           path="/tempadmin"
           element={userRole === "tempadmin" ? <Tempadmin /> : <Navigate to="/login" />}
         >
-          <Route index element={<Navigate to="/tempadmin/orders" replace />} />
-          <Route path="orders" element={<Orders />} />
-          <Route path="tempadmincontrol" element={<Tempadmincontrol />} />
+          <Route index element={<Navigate to="/tempadmin/XeroxOrdertempadmin" replace />} />
+          <Route path="XeroxOrdertempadmin" element={<XeroxOrdertempadmin />} />
+          <Route path="XeroxOrderpreviewtempadmin/:userId/:orderId/:gt" element={<XeroxOrderpreviewtempadmin />} />
+          <Route path="OrdersControlatempadmin" element={<OrdersControlatempadmin />} />
         </Route>
       </Routes>
     </>
