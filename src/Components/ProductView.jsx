@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { database, auth } from "./firebase"; // Make sure this path is correct
+import { database, auth } from "./firebase";
 import { ref, push, set, onValue } from "firebase/database";
 import "../css/ProductView.css";
 
-// Image ID mapping - define this at the top of your file
+// Image ID mapping
 const IMAGE_ID_MAPPING = {
-  "2131230840": "about_us.png",
+    "2131230840": "about_us.png",
   "2131230841": "afoursheet.png",
   "2131230842": "athreenote.png",
   "2131230843": "athreenotee.jpg",
@@ -142,415 +142,320 @@ const IMAGE_ID_MAPPING = {
   "2131231162": "whiteblack_bg.png",
   "2131231163": "women1.png",
   "2131231164": "xoblue.png",
-  "2131231165": "xooblack.png"
+  "2131231165": "xooblack.png",
 };
 
 function ProductView() {
-    const location = useLocation();
-    const product = location.state?.product;
-    const navigate = useNavigate();
-    const [quantity, setQuantity] = useState(1);
-    const [showToast, setShowToast] = useState(false);
-    const [toastMessage, setToastMessage] = useState("");
-    const [currentUser, setCurrentUser] = useState(null);
-    const [cartItems, setCartItems] = useState([]);
-    const [showCartPreview, setShowCartPreview] = useState(false);
-    const [cartCount, setCartCount] = useState(0);
-    const [isInCart, setIsInCart] = useState(false);
-    
-    // Listen for auth state changes
-    useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged(user => {
-            setCurrentUser(user);
-            if (user) {
-                // Fetch cart items
-                const cartRef = ref(database, `userscart/${user.uid}`);
-                onValue(cartRef, (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        const items = Object.values(data);
-                        setCartItems(items);
-                        setCartCount(items.length);
-                        
-                        // Check if current product is in cart
-                        if (product) {
-                            const productInCart = items.some(item => 
-                                item.productname === product.name
-                            );
-                            setIsInCart(productInCart);
-                        }
-                    } else {
-                        setCartItems([]);
-                        setCartCount(0);
-                        setIsInCart(false);
-                    }
-                });
-            }
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [currentProduct, setCurrentProduct] = useState(location.state?.product || null);
+  const [dynamicProducts, setDynamicProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [cartItems, setCartItems] = useState([]);
+  const [cartCount, setCartCount] = useState(0);
+  const [isInCart, setIsInCart] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [showCartPreview, setShowCartPreview] = useState(false);
+
+  // Auth listener & cart
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      setCurrentUser(user);
+      if (user) {
+        const cartRef = ref(database, `userscart/${user.uid}`);
+        onValue(cartRef, snapshot => {
+          const data = snapshot.val();
+          const items = data ? Object.values(data) : [];
+          setCartItems(items);
+          setCartCount(items.length);
+          if (currentProduct) {
+            setIsInCart(items.some(item => item.productname === currentProduct.name));
+          }
         });
-        
-        return () => unsubscribe();
-    }, [product]);
-    
-    if (!product) {
-      return (
-        <div className="product-not-found section-p1">
-          <h2>Product not found</h2>
-          <button className="normal" onClick={() => navigate("/")}>Return to Shop</button>
-        </div>
-      );
+      }
+    });
+    return () => unsubscribe();
+  }, [currentProduct]);
+
+  // Fetch products dynamically
+  useEffect(() => {
+    const productsRef = ref(database, "products");
+    onValue(productsRef, snapshot => {
+      const data = snapshot.val();
+      const items = data ? Object.values(data) : [];
+      setDynamicProducts(items.map(item => ({
+        id: item.id,
+        name: item.name,
+        brand: item.brand,
+        price: item.price,
+        description: item.description,
+        img: item.imageUrl
+      })));
+      setLoading(false);
+    });
+  }, []);
+
+  const showNotification = (message) => {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const getImagePath = (img) => {
+    if (!img) return "/unknowenprofile.png";
+    if (img.startsWith("/") || img.startsWith("http")) return img;
+    const entry = Object.entries(IMAGE_ID_MAPPING).find(([_, val]) => val === img);
+    return entry ? `/${entry[1]}` : "/unknowenprofile.png";
+  };
+
+  const checkIfProductInCart = (product) => {
+    return cartItems.some(item => item.productname === product.name);
+  };
+
+  const addToCart = (productToAdd = currentProduct, qty = quantity) => {
+    if (!currentUser) {
+      navigate("/login");
+      return;
     }
+    if (checkIfProductInCart(productToAdd)) {
+      showNotification(`${productToAdd.name} is already in your cart!`);
+      return;
+    }
+    const cartRef = ref(database, `userscart/${currentUser.uid}`);
+    const newItemRef = push(cartRef);
+    const itemData = {
+      key: newItemRef.key,
+      productname: productToAdd.name,
+      productamt: productToAdd.price.replace("₹", ""),
+      productimage: productToAdd.img,
+      qty,
+      rating: 0,
+      discription: productToAdd.description || `Brand: ${productToAdd.brand}`
+    };
+    set(newItemRef, itemData).then(() => {
+      showNotification(`${productToAdd.name} added to cart!`);
+      setShowCartPreview(true);
+      setTimeout(() => setShowCartPreview(false), 5000);
+      setIsInCart(true);
+    }).catch(err => {
+      console.error(err);
+      alert("Failed to add to cart");
+    });
+  };
 
-    const handleProductClick = (product) => {
-        navigate("/product", { state: { product } });
-    };
-    
-    const handleQuantityChange = (e) => {
-        const value = parseInt(e.target.value);
-        if (value > 0) {
-            setQuantity(value);
-        }
-    };
-    
-    // Get image ID from filename
-    const getImageIdFromPath = (imagePath) => {
-        // Extract the filename from the path
-        const parts = imagePath.split('/');
-        const fileName = parts[parts.length - 1];
-        
-        // Find the ID that corresponds to this filename
-        for (const [id, img] of Object.entries(IMAGE_ID_MAPPING)) {
-            if (img === fileName) {
-                return parseInt(id, 10);
-            }
-        }
-        
-        // Default ID if not found
-        return 2131231165; // Default to xooblack.png
-    };
-    
-    // Check if product is already in cart
-    const checkIfProductInCart = (productToCheck) => {
-        return cartItems.some(item => item.productname === productToCheck.name);
-    };
-    
-    const addToCart = (productToAdd = product, productQty = quantity) => {
-        if (!currentUser) {
-            navigate("/login");
-            return;
-        }
-        
-        // Check if product is already in cart
-        const productInCart = checkIfProductInCart(productToAdd);
-        
-        if (productInCart) {
-            setToastMessage(`${productToAdd.name} is already in your cart!`);
-            showNotification();
-            return;
-        }
-        
-        // Create a reference to the user's cart
-        const cartRef = ref(database, `userscart/${currentUser.uid}`);
-        const newItemRef = push(cartRef);
-        
-        // Prepare item data
-        const itemData = {
-            key: newItemRef.key,
-            productname: productToAdd.name,
-            productamt: productToAdd.price.replace('₹', ''), // Remove currency symbol
-            productimage: getImageIdFromPath(productToAdd.img),
-            qty: productQty,
-            rating: 0,
-            discription: productToAdd.description || `Brand: ${productToAdd.brand} Theme: Plain`
-        };
-        
-        // Add to Firebase
-        set(newItemRef, itemData)
-            .then(() => {
-                setToastMessage(`${productToAdd.name} added to cart!`);
-                showNotification();
-                setShowCartPreview(true); // Show cart preview
-                setTimeout(() => setShowCartPreview(false), 5000); // Hide after 5 seconds
-                setIsInCart(true); // Update state to reflect product is now in cart
-            })
-            .catch(error => {
-                console.error("Error adding to cart:", error);
-                alert("Failed to add item to cart. Please try again.");
-            });
-    };
-    
-    const showNotification = () => {
-        setShowToast(true);
-        setTimeout(() => {
-            setShowToast(false);
-        }, 3000);
-    };
-    
-    // Add featured product directly to cart
-    const addFeaturedToCart = (e, featuredProduct) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Check if product is already in cart
-        const productInCart = checkIfProductInCart(featuredProduct);
-        
-        if (productInCart) {
-            setToastMessage(`${featuredProduct.name} is already in your cart!`);
-            showNotification();
-            return;
-        }
-        
-        addToCart(featuredProduct, 1); // Add quantity 1 by default
-    };
-    
-    // Function to get image paths with proper prefixes
-    const getImagePath = (imgName) => {
-        if (!imgName) return "";
-        // If the path already includes http or / then return as is
-        if (imgName.startsWith('http') || imgName.startsWith('/')) {
-            return imgName;
-        }
-        // Otherwise, add the leading slash for public directory
-        return `/${imgName}`;
-    };
+  const goToCart = () => navigate("/cart");
 
-    // Navigate to cart page
-    const goToCart = () => {
-        navigate("/cart");
-    };
+  const relatedProducts = () => {
+    const sameBrand = dynamicProducts.filter(item => item.id !== currentProduct.id && item.brand === currentProduct.brand);
+    const others = dynamicProducts.filter(item => item.id !== currentProduct.id && !sameBrand.includes(item));
+    return [...sameBrand, ...others].slice(0, 3);
+  };
 
-    // Featured products data
-    const featuredProducts = [
-        { img: "xooblack.png", brand: "Hauser", name: "XO Ball Pen - Black Ink", price: "₹10" },
-        { img: "xoblue.png", brand: "Hauser", name: "XO Ball Pen - Blue Ink", price: "₹10" },
-        { img: "stylishpenblue.jpg", brand: "Stylish", name: "X3 Ball Pen - Blue (0.7mm)", price: "₹7" },
-        { img: "stylishblackpen.png", brand: "Stylish", name: "X3 Ball Pen - Black (0.7mm)", price: "₹7" },
-    ];
-
+  if (!currentProduct) {
     return (
-        <div>
-            {/* Header with cart count */}
-            <div className="product-header">
-                <div className="cart-icon-container" onClick={goToCart}>
-                    <i className="bx bx-cart"></i>
-                    {cartCount > 0 && <span className="cart-count">{cartCount}</span>}
-                </div>
-            </div>
-            
-            {/* Toast notification */}
-            <div className={`toast ${showToast ? 'show' : ''}`}>
-                <i className={`bx ${toastMessage.includes('already') ? 'bx-info-circle' : 'bx-check-circle'}`}></i>
-                <span>{toastMessage}</span>
-            </div>
-            
-            {/* Cart Preview Overlay */}
-            {showCartPreview && (
-                <div className="cart-preview-overlay">
-                    <div className="cart-preview">
-                        <div className="cart-preview-header">
-                            <h3>Cart Preview</h3>
-                            <i className="bx bx-x" onClick={() => setShowCartPreview(false)}></i>
-                        </div>
-                        <div className="cart-preview-items">
-                            {cartItems.slice(-3).map((item, index) => (
-                                <div className="cart-preview-item" key={index}>
-                                    <div className="cart-preview-img">
-                                        <img 
-                                            src={`/${IMAGE_ID_MAPPING[item.productimage]}`} 
-                                            alt={item.productname}
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = "/unknowenprofile.png";
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="cart-preview-details">
-                                        <h4>{item.productname}</h4>
-                                        <p>₹{item.productamt} x {item.qty}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="cart-preview-footer">
-                            <span>{cartItems.length} items in cart</span>
-                            <button className="normal" onClick={goToCart}>View Cart</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            <section id="prodetails" className="section-p1">
-                <div className="single-pro-image">
-                    <img 
-                        src={getImagePath(product.img)} 
-                        width="100%" 
-                        id="MainImg" 
-                        alt={product.name || "Product"} 
-                        onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = "/unknowenprofile.png";
-                        }}
-                    />
-                    <div className="small-img-group">
-                        {[...Array(4)].map((_, index) => (
-                            <div className="small-img-col" key={index}>
-                                <img 
-                                    src={getImagePath(product.img)} 
-                                    width="100%" 
-                                    className="small-img" 
-                                    alt="Product thumbnail"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = "/unknowenprofile.png";
-                                    }}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                
-                <div className="single-pro-details">
-                    <h6>Home / {product.brand || "Category"}</h6>
-                    <h4>{product.name || "Product Name"}</h4>
-                    <div className="price-container">
-                        <h3>{product.price || "Price"}</h3>
-                    </div>
-                    
-                    <div className="add-to-cart-container">
-                        <div className="quantity-controls">
-                            <button 
-                                className="quantity-btn" 
-                                onClick={() => setQuantity(prev => prev > 1 ? prev - 1 : 1)}
-                                disabled={isInCart}
-                            >-</button>
-                            <input 
-                                type="number" 
-                                value={quantity} 
-                                onChange={handleQuantityChange} 
-                                min="1"
-                                disabled={isInCart}
-                            />
-                            <button 
-                                className="quantity-btn" 
-                                onClick={() => setQuantity(prev => prev + 1)}
-                                disabled={isInCart}
-                            >+</button>
-                        </div>
-                        {isInCart ? (
-                            <button className="normal in-cart-btn" onClick={goToCart}>
-                                <i className="bx bx-check"></i> Already in Cart - View Cart
-                            </button>
-                        ) : (
-                            <button className="normal add-cart-btn" onClick={() => addToCart()}>
-                                <i className="bx bx-cart-add"></i> Add To Cart
-                            </button>
-                        )}
-                    </div>
-                    
-                    <div className="product-info">
-                        <h4>Product Details</h4>
-                        <span>{product.description || "No description available"}</span>
-                    </div>
-                    
-                    <div className="product-features">
-                        <div className="feature">
-                            <i className="bx bx-check"></i>
-                            <span>Quality Assurance</span>
-                        </div>
-                        <div className="feature">
-                            <i className="bx bx-check"></i>
-                            <span>Fast Delivery</span>
-                        </div>
-                        <div className="feature">
-                            <i className="bx bx-check"></i>
-                            <span>Easy Returns</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-            
-            <section id="product1" className="section-p1">
-                <h2>Featured Products</h2>
-                <p>Stationary Products</p>
-                <div className="pro-container">
-                    {featuredProducts.map((item, index) => {
-                        const featuredProductInCart = checkIfProductInCart(item);
-                        return (
-                            <div className="pro" key={index} onClick={() => handleProductClick(item)}>
-                                <img 
-                                    className="shirt" 
-                                    src={getImagePath(item.img)} 
-                                    alt={item.name}
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = "/unknowenprofile.png";
-                                    }}
-                                />
-                                <div className="des">
-                                    <span>{item.brand}</span>
-                                    <h5>{item.name}</h5>
-                                    <div className="price-tag">
-                                        <h4>{item.price}</h4>
-                                    </div>
-                                </div>
-                                {featuredProductInCart ? (
-                                    <a href="#" onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setToastMessage(`${item.name} is already in your cart!`);
-                                        showNotification();
-                                    }}>
-                                        <i className="bx bx-check cart-added"></i>
-                                    </a>
-                                ) : (
-                                    <a href="#" onClick={(e) => addFeaturedToCart(e, item)}>
-                                        <i className="bx bx-cart cart"></i>
-                                    </a>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </section>
-            
-            <footer className="section-p1">
-                <div className="col">
-                    <h3>Jasa Essential</h3>
-                    <h4>Contact</h4>
-                    <p><strong>Address:</strong> 562 Wellington Road, Street 32, San Francisco</p>
-                    <p><strong>Phone:</strong> +01 2222 345 / (+91) 0 123 456 789</p>
-                    <p><strong>Hours:</strong> 10:00 - 18:00, Mon - Sat</p>
-                    <div className="follow">
-                        <h4>Follow us</h4>
-                        <div className="icon">
-                            <i className="bx bxl-facebook"></i>
-                            <i className="bx bxl-twitter"></i>
-                            <i className="bx bxl-instagram"></i>
-                            <i className="bx bxl-pinterest-alt"></i>
-                            <i className="bx bxl-youtube"></i>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="col">
-                    <h4>About</h4>
-                    <a href="#">About us</a>
-                    <a href="#">Delivery Information</a>
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms & Conditions</a>
-                    <a href="#">Contact Us</a>
-                </div>
-                
-                <div className="col">
-                    <h4>My Account</h4>
-                    <a href="#">Sign In</a>
-                    <a href="#" onClick={goToCart}>View Cart</a>
-                    <a href="#">My Wishlist</a>
-                    <a href="#">Track My Order</a>
-                    <a href="#">Help</a>
-                </div>
-            </footer>
-        </div>
+      <div className="product-not-found section-p1">
+        <h2>Product not found</h2>
+        <button className="normal" onClick={() => navigate("/")}>Return to Shop</button>
+      </div>
     );
+  }
+
+  return (
+    <div>
+      {/* Toast */}
+      <div className={`toast ${showToast ? "show" : ""}`}>
+        <i className={`bx ${toastMessage.includes("already") ? "bx-info-circle" : "bx-check-circle"}`}></i>
+        <span>{toastMessage}</span>
+      </div>
+      {showCartPreview && (
+        <div className="cart-preview-overlay">
+          <div className="cart-preview">
+            <div className="cart-preview-header">
+              <h3>Cart Preview</h3>
+              <i className="bx bx-x" onClick={() => setShowCartPreview(false)}></i>
+            </div>
+            <div className="cart-preview-items">
+              {cartItems.slice(-3).map((item, idx) => (
+                <div className="cart-preview-item" key={idx}>
+                  <div className="cart-preview-img">
+                    <img src={getImagePath(item.productimage)} alt={item.productname} />
+                  </div>
+                  <div className="cart-preview-details">
+                    <h4>{item.productname}</h4>
+                    <p>₹{item.productamt} × {item.qty}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="cart-preview-footer">
+              <span>{cartItems.length} items in cart</span>
+              <button className="normal" onClick={goToCart}>View Cart</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Product Details */}
+      <section id="prodetails" className="section-p1">
+        <div className="single-pro-image">
+          <img src={getImagePath(currentProduct.img)} alt={currentProduct.name} width="100%" />
+          <div className="small-img-group">
+            {[...Array(4)].map((_, idx) => (
+              <div className="small-img-col" key={idx}>
+                <img src={getImagePath(currentProduct.img)} alt="Thumbnail" className="small-img" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="single-pro-details">
+          <h6>Home / {currentProduct.brand}</h6>
+          <h4>{currentProduct.name}</h4>
+          <div className="price-container"><h3>{currentProduct.price}</h3></div>
+          <div className="add-to-cart-container">
+            <div className="quantity-controls">
+              <button onClick={() => setQuantity(q => q > 1 ? q - 1 : 1)} disabled={isInCart}>-</button>
+              <input type="number" value={quantity} min="1" onChange={e => setQuantity(Number(e.target.value))} disabled={isInCart}/>
+              <button onClick={() => setQuantity(q => q + 1)} disabled={isInCart}>+</button>
+            </div>
+            {isInCart ? (
+              <button className="normal in-cart-btn" onClick={goToCart}>
+                <i className="bx bx-check"></i> Already in Cart
+              </button>
+            ) : (
+              <button className="normal add-cart-btn" onClick={() => addToCart()}>
+                <i className="bx bx-cart-add"></i> Add To Cart
+              </button>
+            )}
+          </div>
+          <div className="product-info">
+            <h4>Product Details</h4>
+            <span>{currentProduct.description || "No description available"}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Newly Added Products */}
+      <section id="product1" className="section-p1">
+        <h2>Newly Added Products</h2>
+        <div className="pro-container">
+          {dynamicProducts.map((item, idx) => (
+            <div
+              className="pro"
+              key={idx}
+              onClick={() => {
+                setCurrentProduct(item);
+                setIsInCart(checkIfProductInCart(item));
+                setQuantity(1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              <img src={getImagePath(item.img)} alt={item.name} />
+              <div className="des">
+                <span>{item.brand}</span>
+                <h5>{item.name}</h5>
+                
+                <div className="price-tag"><h4>{item.price}</h4></div>
+              </div>
+              {checkIfProductInCart(item) ? (
+                <a href="#" onClick={e => { e.preventDefault(); showNotification(`${item.name} is already in your cart!`); }}>
+                  <i className="bx bx-check cart-added"></i>
+                </a>
+              ) : (
+                <a href="#" onClick={e => { e.preventDefault(); addToCart(item, 1); }}>
+                  <i className="bx bx-cart cart"></i>
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Related Products */}
+      <section id="related-products" className="section-p1">
+        <h2>Related Products</h2>
+        <div className="pro-container">
+          {relatedProducts().map((item, idx) => (
+            <div
+              className="pro"
+              key={idx}
+              onClick={() => {
+                setCurrentProduct(item);
+                setIsInCart(checkIfProductInCart(item));
+                setQuantity(1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              <img src={getImagePath(item.img)} alt={item.name} />
+              <div className="des">
+                <span>{item.brand}</span>
+                <h5>{item.name}</h5>
+                <div className="price-tag"><h4>{item.price}</h4></div>
+              </div>
+              {checkIfProductInCart(item) ? (
+                <a href="#" onClick={e => { e.preventDefault(); showNotification(`${item.name} is already in your cart!`); }}>
+                  <i className="bx bx-check cart-added"></i>
+                </a>
+              ) : (
+                <a href="#" onClick={e => { e.preventDefault(); addToCart(item, 1); }}>
+                  <i className="bx bx-cart cart"></i>
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-col about">
+            <h3>Jasa Essential</h3>
+            <p>
+              Your trusted partner for quality stationery products for students and professionals.
+              We offer a wide range of supplies at competitive prices.
+            </p>
+            <div className="social-icons">
+              <a href="#"><i className="bx bxl-instagram"></i></a>
+            </div>
+          </div>
+          <div className="footer-col">
+            <h4>Quick Links</h4>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/shop">Shop</a></li>
+              <li><a href="/about">About Us</a></li>
+              <li><a href="/contact">Contact</a></li>
+              <li><a href="/faq">FAQ</a></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Customer Service</h4>
+            <ul>
+              <li><a href="/account">My Account</a></li>
+              <li><a href="/orders">Order History</a></li>
+              <li><a href="/shipping">Shipping Policy</a></li>
+              <li><a href="/returns">Returns & Exchanges</a></li>
+              <li><a href="/terms">Terms & Conditions</a></li>
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Contact Us</h4>
+            <ul className="contact-info">
+              <li><i className="bx bx-map"></i> 2/3 line medu pension line, Salem 636006</li>
+              <li><i className="bx bx-phone"></i> (+91) 7418676705</li>
+              <li><i className="bx bx-envelope"></i> jasaessential@gmail.com</li>
+            </ul>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <p>© 2025 Jasa Essential. All Rights Reserved.</p>
+          <p>Developed by <strong>RapCode Tech Solutions</strong></p>
+        </div>
+      </footer>
+    </div>
+  );
 }
 
 export default ProductView;

@@ -4,7 +4,7 @@ import { ref, set, get, push } from "firebase/database";
 import { useNavigate } from "react-router-dom";
 import "../css/Checkout.css";
 
-
+// Image ID mapping
 const IMAGE_ID_MAPPING = {
   "2131230840": "about_us.png",
   "2131230841": "afoursheet.png",
@@ -145,61 +145,24 @@ const IMAGE_ID_MAPPING = {
   "2131231165": "xooblack.png"
 };
 
-// Create reverse mapping for lookup (image name to ID)
-const REVERSE_IMAGE_MAPPING = {};
-for (const [id, name] of Object.entries(IMAGE_ID_MAPPING)) {
-  REVERSE_IMAGE_MAPPING[name] = id;
-}
-
-// Helper function to extract image name from URL/path
+// Extract image name from path
 const extractImageName = (imagePath) => {
-  // First, ensure imagePath is a string
-  if (!imagePath || typeof imagePath !== 'string') {
-    console.warn("Invalid image path:", imagePath);
-    return "";
-  }
-  
-  // Handle different path formats
-  const parts = imagePath.split('/');
-  const fileName = parts[parts.length - 1];
-  return fileName; // Keep the extension for exact matching
+  if (!imagePath || typeof imagePath !== "string") return "";
+  const parts = imagePath.split("/");
+  return parts[parts.length - 1];
 };
 
-// Function to find image ID from path
-const getImageIdFromPath = (imagePath) => {
-  // Direct ID check - if the imagePath is already an ID in our mapping
-  if (IMAGE_ID_MAPPING[imagePath]) {
-    return imagePath; // It's already an ID, return as is
-  }
-  
-  // If imagePath is a number as string, check if it's a valid ID
-  if (/^\d+$/.test(imagePath) && IMAGE_ID_MAPPING[imagePath]) {
-    return imagePath;
-  }
-  
-  // Otherwise try to extract the filename and find its ID
-  const imageName = extractImageName(imagePath);
-  
-  // If no valid image name, return default
-  if (!imageName) return "0";
-  
-  // Look for exact match first
-  if (REVERSE_IMAGE_MAPPING[imageName]) {
-    return REVERSE_IMAGE_MAPPING[imageName];
-  }
-  
-  // If no exact match, try to find by file name without extension
-  const nameWithoutExt = imageName.split('.')[0];
-  
-  // Try to find any mapping that contains this name
-  for (const [id, name] of Object.entries(IMAGE_ID_MAPPING)) {
-    if (name.includes(nameWithoutExt)) {
-      return id;
-    }
-  }
-  
-  // If all else fails, return default
-  return "0";
+// Get image URL from IMAGE_ID_MAPPING or fallback
+const getImageUrl = (imageIdOrPath) => {
+  if (!imageIdOrPath) return "/unknowenprofile.png";
+
+  // If it's an ID in mapping
+  if (IMAGE_ID_MAPPING[imageIdOrPath]) return `/${IMAGE_ID_MAPPING[imageIdOrPath]}`;
+
+  // If it's a path or URL, extract filename and match mapping
+  const name = extractImageName(imageIdOrPath);
+  const id = Object.keys(IMAGE_ID_MAPPING).find(key => IMAGE_ID_MAPPING[key] === name);
+  return id ? `/${IMAGE_ID_MAPPING[id]}` : imageIdOrPath;
 };
 
 const Checkout = () => {
@@ -207,210 +170,123 @@ const Checkout = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalAmount, setTotalAmount] = useState(0);
-  const [formData, setFormData] = useState({
-    username: "",
-    phno: "",
-    address: ""
-  });
+  const [formData, setFormData] = useState({ username: "", phno: "", address: "" });
+
   const navigate = useNavigate();
 
+  // Auth and fetch cart
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
-      
       if (currentUser) {
-        // Fetch complete user details if available
+        // Fetch user details
         const userRef = ref(database, `users/${currentUser.uid}`);
-        get(userRef).then((snapshot) => {
-          if (snapshot.exists()) {
-            const userData = snapshot.val();
-            setFormData(prevData => ({
-              ...prevData,
-              username: userData.name || "",
-              phno: userData.phno || "",
-              address: userData.address || ""
-            }));
-          }
-        });
-        
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          const userData = snapshot.val();
+          setFormData({
+            username: userData.name || "",
+            phno: userData.phno || "",
+            address: userData.address || ""
+          });
+        }
         fetchCartItems(currentUser.uid);
       } else {
         setLoading(false);
         navigate("/login");
       }
     });
-    
     return () => unsubscribe();
   }, [navigate]);
 
-  const fetchCartItems = (userId) => {
+  // Fetch cart items from userscart
+  const fetchCartItems = async (userId) => {
     setLoading(true);
-    const userCartRef = ref(database, `userscart/${userId}`);
-    
-    get(userCartRef)
-      .then((snapshot) => {
-        if (snapshot.exists()) {
-          const items = [];
-          snapshot.forEach((childSnapshot) => {
-            items.push({
-              id: childSnapshot.key,
-              ...childSnapshot.val()
-            });
-          });
-          setCartItems(items);
-          calculateTotal(items);
-        } else {
-          setCartItems([]);
-          navigate("/cart"); // Redirect to cart if it's empty
-        }
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error("Error fetching cart items:", error);
-        setLoading(false);
-      });
+    try {
+      const cartRef = ref(database, `userscart/${userId}`);
+      const snapshot = await get(cartRef);
+      if (snapshot.exists()) {
+        const items = [];
+        snapshot.forEach(child => {
+          items.push({ id: child.key, ...child.val() });
+        });
+        setCartItems(items);
+        calculateTotal(items);
+      } else {
+        setCartItems([]);
+        navigate("/cart");
+      }
+    } catch (err) {
+      console.error("Error fetching cart items:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const calculateTotal = (items) => {
-    const total = items.reduce((sum, item) => {
-      return sum + (parseFloat(item.productamt) * item.qty);
-    }, 0);
+    const total = items.reduce((sum, item) => sum + (parseFloat(item.productamt) * item.qty), 0);
     setTotalAmount(total);
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
-  const handlePlaceOrder = (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    
-    if (!user) {
-      alert("Please log in to place an order");
-      navigate("/login");
-      return;
-    }
-    
+    if (!user) return navigate("/login");
     if (!formData.username || !formData.phno || !formData.address) {
-      alert("Please fill in all required fields");
+      alert("Please fill all fields");
       return;
     }
-    
-    // Current timestamp
+    if (totalAmount < 50) {
+      alert("Minimum order amount is ₹50. Please add more items to your cart.");
+      return;
+    }
+
+    const orderId = push(ref(database, "orders")).key;
     const orderTimestamp = Date.now();
-    
-    // Generate a unique order ID
-    const orderId = push(ref(database, 'orders')).key;
-    
-    // Prepare order metadata
-    const orderMetadata = {
-      address: formData.address,
-      phno: formData.phno,
-      username: formData.username,
-      orderTimestamp: orderTimestamp,
-      orderTotal: totalAmount.toFixed(2),
-      odered: true,
-      delivered: false,
-    };
-    
-    // Prepare order items object
+
     const orderItems = {};
-    cartItems.forEach((item) => {
-      try {
-        // Get the image ID from the path
-        const imageId = getImageIdFromPath(item.productimage);
-        
-        // Store the item with image ID instead of path
-        orderItems[item.id] = {
-          productname: item.productname,
-          productamt: item.productamt,
-          productimage: imageId, // Store the image ID instead of the path
-          qty: item.qty,
-          rating: item.rating || 0,
-          discription: item.discription || "",
-          key: item.id
-        };
-        
-        console.log(`Mapped ${item.productimage} to ID: ${imageId}`);
-      } catch (error) {
-        console.error("Error processing item:", item, error);
-        // Still add the item, but with a default image ID
-        orderItems[item.id] = {
-          productname: item.productname,
-          productamt: item.productamt,
-          productimage: "0", // Default image ID
-          qty: item.qty,
-          rating: item.rating || 0,
-          discription: item.discription || "",
-          key: item.id
-        };
-      }
+    cartItems.forEach(item => {
+      orderItems[item.id] = {
+        productname: item.productname,
+        productamt: item.productamt,
+        productimage: item.productimage || "2131231153",
+        qty: item.qty,
+        rating: item.rating || 0,
+        description: item.description || ""
+      };
     });
-    
-    
-    // Create complete order object with metadata and items
+
     const completeOrder = {
-      ...orderMetadata,
-      ...orderItems
+      username: formData.username,
+      phno: formData.phno,
+      address: formData.address,
+      orderTimestamp,
+      orderTotal: totalAmount.toFixed(2),
+      ordered: true,
+      delivered: false,
+      items: orderItems
     };
-    
-    // Set the order in the database under ordersusers path
-    const ordersUserRef = ref(database, `userorders/${user.uid}/${orderId}`);
-    
-    // Save the order
-    set(ordersUserRef, completeOrder)
-      .then(() => {
-        // Clear the active cart
-        const userActiveCartRef = ref(database, `userscart/${user.uid}`);
-        set(userActiveCartRef, null)
-          .then(() => {
-            // Also clear the userscart reference
-            const userCartRef = ref(database, `userscart/${user.uid}`);
-            set(userCartRef, null)
-              .then(() => {
-                // Navigate to Success component after order is placed
-                navigate("/success", { 
-                  state: { 
-                    orderId: orderId,
-                    totalAmount: totalAmount.toFixed(2) 
-                  } 
-                });
-              })
-              .catch((error) => {
-                console.error("Error clearing userscart:", error);
-                alert("Order placed but failed to clear cart. Please check your orders.");
-              });
-          })
-          .catch((error) => {
-            console.error("Error clearing cart:", error);
-            alert("Order placed but failed to clear cart. Please check your orders.");
-          });
-      })
-      .catch((error) => {
-        console.error("Error placing order:", error);
-        alert("Failed to place order. Please try again.");
-      });
+
+    try {
+      const orderRef = ref(database, `userorders/${user.uid}/${orderId}`);
+      await set(orderRef, completeOrder);
+
+      // Clear cart
+      const cartRef = ref(database, `userscart/${user.uid}`);
+      await set(cartRef, null);
+
+      navigate("/success", { state: { orderId, totalAmount: totalAmount.toFixed(2) } });
+    } catch (err) {
+      console.error("Error placing order:", err);
+      alert("Failed to place order");
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="section-p1">
-        <h2>Loading checkout...</h2>
-      </div>
-    );
-  }
-
-  const getImageUrl = (imageId) => {
-    // Get the filename from the mapping or use default
-    const filename = IMAGE_ID_MAPPING[imageId.toString()] || "unknowenprofile.png";
-    
-    // Add the leading slash to reference from the public directory
-    return `/${filename}`;
-  };
+  if (loading) return <div className="section-p1"><h2>Loading checkout...</h2></div>;
 
   return (
     <div>
@@ -425,125 +301,107 @@ const Checkout = () => {
             <h3>Shipping Details</h3>
             <form onSubmit={handlePlaceOrder}>
               <div className="form-group">
-                <label htmlFor="username">Full Name</label>
-                <input 
-                  type="text" 
-                  id="username" 
-                  name="username" 
-                  value={formData.username} 
-                  onChange={handleInputChange}
-                  required 
-                />
+                <label>Full Name</label>
+                <input type="text" name="username" value={formData.username} onChange={handleInputChange} required />
               </div>
-              
               <div className="form-group">
-                <label htmlFor="phno">Phone Number</label>
-                <input 
-                  type="tel" 
-                  id="phno" 
-                  name="phno" 
-                  value={formData.phno} 
-                  onChange={handleInputChange}
-                  required 
-                />
+                <label>Phone Number</label>
+                <input type="tel" name="phno" value={formData.phno} onChange={handleInputChange} required />
               </div>
-              
               <div className="form-group">
-                <label htmlFor="address">Delivery Address</label>
-                <textarea 
-                  id="address" 
-                  name="address" 
-                  value={formData.address} 
-                  onChange={handleInputChange}
-                  required 
-                  rows="4"
-                ></textarea>
+                <label>Delivery Address</label>
+                <textarea name="address" value={formData.address} onChange={handleInputChange} required rows="4"></textarea>
               </div>
-              
               <button type="submit" className="normal">Confirm Order</button>
             </form>
           </div>
-          
+
           <div className="order-summary">
             <h3>Order Summary</h3>
             <div className="summary-items">
-              {cartItems.map((item) => (
+              {cartItems.map(item => (
                 <div key={item.id} className="summary-item">
                   <div className="item-info">
-                    <img 
-                      src={getImageUrl(item.productimage)} 
-                      alt={item.productname} 
-                      className="summary-img" 
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = "/unknowenprofile.png"; // Fallback image
-                      }}
+                    <img
+                      src={getImageUrl(item.productimage)}
+                      alt={item.productname}
+                      className="summary-img"
+                      onError={(e) => { e.target.src = "/unknowenprofile.png"; }}
                     />
                     <div>
                       <h4>{item.productname}</h4>
                       <p>Qty: {item.qty}</p>
                     </div>
                   </div>
-                  <div className="item-price">
-                    ₹{(parseFloat(item.productamt) * item.qty).toFixed(2)}
-                  </div>
+                  <div className="item-price">₹{(parseFloat(item.productamt) * item.qty).toFixed(2)}</div>
                 </div>
               ))}
             </div>
-            
+
             <div className="summary-total">
-              <div className="total-row">
-                <span>Subtotal</span>
-                <span>₹{totalAmount.toFixed(2)}</span>
-              </div>
-              <div className="total-row">
-                <span>Shipping</span>
-                <span>Free</span>
-              </div>
-              <div className="total-row final-total">
-                <span>Total</span>
-                <span>₹{totalAmount.toFixed(2)}</span>
-              </div>
+              <div className="total-row"><span>Subtotal</span><span>₹{totalAmount.toFixed(2)}</span></div>
+              <div className="total-row"><span>Shipping</span><span>Free</span></div>
+              <div className="total-row final-total"><span>Total</span><span>₹{totalAmount.toFixed(2)}</span></div>
             </div>
           </div>
         </div>
       </section>
-      
-      <footer className="section-p1">
-        <div className="col">
-          <h3>Jasa Essential</h3>
-          <h4>Contact</h4>
-          <p><strong>Address:</strong> 562 Wellington Road, Street 32, San Francisco</p>
-          <p><strong>Phone:</strong> +01 2222 345 / (+91) 0 123 456 789</p>
-          <p><strong>Hours:</strong> 10:00 - 18:00, Mon - Sat</p>
-          <div className="follow">
-            <h4>Follow us</h4>
-            <div className="icon">
-              <i className="bx bxl-facebook"></i>
-              <i className="bx bxl-twitter"></i>
-              <i className="bx bxl-instagram"></i>
-              <i className="bx bxl-pinterest-alt"></i>
-              <i className="bx bxl-youtube"></i>
+
+      {/* Footer */}
+      <footer className="modern-footer">
+        <div className="footer-content">
+          <div className="footer-column brand-column">
+            <h3>Jasa Essential</h3>
+            <p>Your trusted partner for quality stationery products for students and professionals. We offer a wide range of supplies at competitive prices.</p>
+            <div className="social-icons">
+              
+              <a href="https://www.instagram.com/jasa_essential?igsh=MWVpaXJiZGhzeDZ4Ng=="><i className="bx bxl-instagram"></i></a>
+              
             </div>
           </div>
+          
+          <div className="footer-column">
+            <h4>Quick Links</h4>
+            <ul>
+              <li><a href="#">Home</a></li>
+              <li><a href="#">Shop</a></li>
+              <li><a href="#">About Us</a></li>
+              <li><a href="#">Contact</a></li>
+              <li><a href="#">FAQ</a></li>
+            </ul>
+          </div>
+          
+          <div className="footer-column">
+            <h4>Customer Service</h4>
+            <ul>
+              <li><a href="#">My Account</a></li>
+              <li><a href="#">Order History</a></li>
+              <li><a href="#">Shipping Policy</a></li>
+              <li><a href="#">Returns & Exchanges</a></li>
+              <li><a href="#">Terms & Conditions</a></li>
+            </ul>
+          </div>
+          
+          <div className="footer-column contact-info">
+            <h4>Contact Us</h4>
+            <p><i className="bx bx-map"></i> 2/3 line medu pension line 2 nd street  line medu , salem 636006</p>
+            <p><i className="bx bx-phone"></i> (+91) 7418676705</p>
+            
+            <p><i className="bx bx-envelope"></i> jasaessential@gmail.com</p>
+          </div>
         </div>
-
-        <div className="col">
-          <h4>About</h4>
-          <a href="#">About us</a>
-          <a href="#">Delivery Information</a>
-          <a href="#">Privacy Policy</a>
-          <a href="#">Terms & Conditions</a>
-          <a href="#">Contact Us</a>
-        </div>
-
-        <div className="col">
-          <h4>My Account</h4>
-          <a href="#">Sign In</a>
-          <a href="#">View Cart</a>
-          <a href="#">My Wishlist</a>
-          <a href="#">Track My Order</a>
-          <a href="#">Help</a>
+        
+        <div className="footer-bottom" style={{display:"block"}}>
+          <p>&copy; 2025 Jasa Essential. All Rights Reserved.</p>
+          {/* <div className="payment-methods">
+            <i className="bx bxl-visa"></i>
+            <i className="bx bxl-mastercard"></i>
+            <i className="bx bxl-paypal"></i>
+            <i className="bx bxl-google-pay"></i>
+          </div> */}
+          <div className="footer-content">
+        <p className="copyright1" style={{flexDirection:"row"}}>Developed by <a href="https://rapcodetechsolutions.netlify.app/" className="develop-aa"><img src="/Rapcode.png" style={{width:"20px",height:"20px",display:"flex",margin:"auto",flexDirection:"row", marginLeft:"10px"}} alt="RapCode Logo"></img>RapCode Tech Solutions</a></p>
+      </div>
         </div>
       </footer>
     </div>

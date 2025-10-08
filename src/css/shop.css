@@ -333,6 +333,7 @@
     padding-top: 100%; /* 1:1 Aspect Ratio */
     overflow: hidden;
     background-color: #f5f5f5;
+    
   }
   
   .product-image-container img {
@@ -366,6 +367,7 @@
     transform: translateX(0);
   }
   
+  
   .cart-btn, .view-btn {
     width: 40px;
     height: 40px;
@@ -391,7 +393,180 @@
     background-color: var(--success);
     color: var(--white);
   }
+ /* Slideshow Section with Background */
+  /* ---------------- Slideshow Banner Section ---------------- */
+ /* ---------------- Slideshow Banner Section ---------------- */
+/* Slideshow Section */
+.offers-slideshow-section {
+  width: 100%;
+  margin: 0 auto;
+  margin-bottom: 30px;
+  position: relative;
+  overflow: hidden;
+ 
+}
+
+
+
+.slideshow-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #ff512f, #dd2476); /* base gradient */
+  border-radius: 14px;
+  padding: 30px;
+  position: relative;
+  height: 380px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+/* ✅ Background template image with transparency */
+.slideshow-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: url("0f11d054-c6ca-4b85-8b28-11b5baf75696.jpg") center/cover no-repeat;
+  opacity: 0.25;              /* transparent overlay */
+  z-index: 1;
+  border-radius: 14px;
+}
+
+/* Left Side Text */
+.slideshow-content {
+  color: #e6e2e2;
+  max-width: 50%;
+  z-index: 2;
+  animation: fadeInLeft 1s ease;
+  position: relative;
+}
+
+.slideshow-content h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.slideshow-content p {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+}
+
+.slideshow-content .price {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #ffeb3b;
+}
+
+/* Right Side Product Image */
+.offers-slideshow-img {
+  position: relative;
+  z-index: 2;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background-color: linear-gradient(135deg, #ff512f, #dd2476);
+  /* ✅ transparent background */
+  transition: transform 0.4s ease-in-out;
+  cursor: pointer;
+}
+
+.offers-slideshow-img:hover {
+  transform: scale(1.05);
   
+}
+
+/* Full Template Image (if needed) */
+.offers-slideshow-img.template {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  
+}
+
+/* Dots */
+.dots-container {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 3;
+}
+
+.dot {
+  height: 12px;
+  width: 12px;
+  margin: 0 4px;
+  background-color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  display: inline-block;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.dot.active {
+  background-color: #fff;
+  transform: scale(1.2);
+}
+
+/* Animations */
+@keyframes fadeInLeft {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+
+/* Dots */
+.dots-container {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 3;
+}
+
+.dot {
+  height: 12px;
+  width: 12px;
+  margin: 0 4px;
+  background-color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  display: inline-block;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.dot.active {
+  background-color: #fff;
+  transform: scale(1.2);
+}
+
+/* Animations */
+@keyframes fadeInLeft {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+
+
   .product-info {
     padding: 1.2rem;
     display: flex;
