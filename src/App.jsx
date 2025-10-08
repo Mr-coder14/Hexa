@@ -45,6 +45,8 @@ import "./css/index.css";
 import XeroxOrderUser from "./Components/XeroxOrdersuser";
 import Xeroxorderpreview from "./Components/Xeroxoderpreview"; 
 import XeroxAllordersmAdmin from "./Components/XeroxAllordersmAdmin";
+import AddProduct from "./Components/AddProduct";
+import Products from "./Components/Products";
 
 // Navbar component
 function Navbar({ user, profileImageUrl }) {
@@ -563,6 +565,12 @@ function App() {
               element={<ProfileTempadmin />}
             />
           </Route>
+          <Route path="/admin" element={<Admin />}>
+          <Route path="addproduct" element={<AddProduct />} />
+          <Route path="products" element={<Products />} />
+          
+          
+        </Route>
         </Routes>
       </>
     );
