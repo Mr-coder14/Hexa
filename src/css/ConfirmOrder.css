@@ -27,8 +27,9 @@
 .address-fields input {
   padding: 10px;
   border: 1px solid #ccc;
-  
-  background-color: #e8f0fe;
+  color-scheme: light;
+  background-color: #e8f0fe !important;
+  color: #000 !important;
   border-radius: 6px;
   font-size: 14px;
 }
