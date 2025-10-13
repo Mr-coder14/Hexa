@@ -484,9 +484,9 @@ function ConfirmOrder() {
       </button>
       
       {/* Minimum order warning */}
-      {orderDetails.totalCost < 50 && (
+      {orderDetails.totalCost < 100 && (
         <div className="minimum-order-warning">
-          Minimum order amount should be more than ₹50
+          Minimum order amount should be more than ₹100
         </div>
       )}
     </div>
