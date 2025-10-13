@@ -248,7 +248,7 @@ function XeroxOrderpreviewtempadmin() {
         if (dev && up) {
           alert('Order processed successfully!');
           // Navigate to main admin page
-          navigate('/tempadmin');
+          navigate('/admin');
         }
       } else {
         alert('No files found for this order');
