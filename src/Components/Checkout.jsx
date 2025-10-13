@@ -240,8 +240,8 @@ const Checkout = () => {
       alert("Please fill all fields");
       return;
     }
-    if (totalAmount < 50) {
-      alert("Minimum order amount is ₹50. Please add more items to your cart.");
+    if (totalAmount < 100) {
+      alert("Minimum order amount is ₹100. Please add more items to your cart.");
       return;
     }
 
