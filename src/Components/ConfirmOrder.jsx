@@ -298,7 +298,7 @@ function ConfirmOrder() {
     
     // Check if total amount is greater than 50
     if (orderDetails.totalCost < 100) {
-      setError("Minimum order amount should be more than ₹50");
+      setError("Minimum order amount should be more than ₹100");
       return;
     }
 
