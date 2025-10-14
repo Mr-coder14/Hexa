@@ -149,7 +149,7 @@ function ConfirmOrder() {
         notes,
         uploadTime: Date.now(),
         username,
-        paid: false,
+        orderd: true,
         delivered: false,
         deliveryamt0: "Free",
         grandTotal0: orderDetails.totalCost.toFixed(2),
