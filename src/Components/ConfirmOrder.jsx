@@ -149,7 +149,6 @@ function ConfirmOrder() {
         notes,
         uploadTime: Date.now(),
         username,
-        orderd: true,
         paid: false,
         delivered: false,
         deliveryamt0: "Free",
