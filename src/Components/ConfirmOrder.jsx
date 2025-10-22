@@ -150,6 +150,7 @@ function ConfirmOrder() {
         uploadTime: Date.now(),
         username,
         orderd: true,
+        paid: false,
         delivered: false,
         deliveryamt0: "Free",
         grandTotal0: orderDetails.totalCost.toFixed(2),
@@ -172,7 +173,7 @@ function ConfirmOrder() {
       for (let i = 0; i < fileDetailsArray.length; i++) {
         const fileDetail = fileDetailsArray[i];
         const safeFileName = fileDetail[`name${i}`].replace(/[.#$\[\]]/g, "_");
-        const hasSpiral = orderDetails.files[i].spiralBinding === true;
+        const hasSpiral = orderDetails.files[i].bindingType;
 
         const completeOrderData = {
           ...baseOrderData,
@@ -188,7 +189,7 @@ function ConfirmOrder() {
           sheet0: fileDetail[`sheet${i}`],
           uri0: fileDetail[`uri${i}`],
           userid0: fileDetail[`userid${i}`],
-          spiral: hasSpiral
+          bindingType: hasSpiral
         };
 
         const orderRef = dbRef(database, `pdfs/${userId}/${orderId}/${safeFileName}`);
@@ -277,7 +278,9 @@ function ConfirmOrder() {
                 <div className="detail-item"><span className="detail-label">Format:</span><span className="detail-value">{fileData.format}</span></div>
                 <div className="detail-item"><span className="detail-label">Ratio:</span><span className="detail-value">{fileData.ratio}</span></div>
                 <div className="detail-item"><span className="detail-label">Quantity:</span><span className="detail-value">{fileData.quantity}</span></div>
-                <div className="detail-item"><span className="detail-label">Binding:</span><span className="detail-value">{fileData.spiralBinding ? "Yes" : "No"}</span></div>
+                <div className="detail-item"><span className="detail-label">Binding:</span><span className="detail-value">{fileData.bindingType && fileData.bindingType !== 'none'
+                      ? fileData.bindingType.charAt(0).toUpperCase() + fileData.bindingType.slice(1)
+                      : "No"}</span></div>
                 <div className="detail-item"><span className="detail-label">Per Page:</span><span className="detail-value">₹{fileData.perPagePrice.toFixed(2)}</span></div>
                 <div className="detail-item"><span className="detail-label">Amount per qty:</span><span className="detail-value">₹{fileData.amountPerQuantity.toFixed(2)}</span></div>
                 <div className="detail-item final-amount"><span className="detail-label">Final Amount:</span><span className="detail-value">₹{fileData.finalAmount.toFixed(2)}</span></div>
