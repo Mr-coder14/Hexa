@@ -155,7 +155,7 @@ function XeroxOrderpreviewtempadmin() {
                 finalAmount: fileData.finalamt0 || 0,
                 uploadTime: fileData.uploadTime || 0,
                 notes: fileData.notes || '',
-                spiral: fileData.spiral || false
+                bindingType: fileData.bindingType || "none"
               });
             });
           }
@@ -248,7 +248,7 @@ function XeroxOrderpreviewtempadmin() {
         if (dev && up) {
           alert('Order processed successfully!');
           // Navigate to main admin page
-          navigate('/admin');
+          navigate('/admin/dashboard');
         }
       } else {
         alert('No files found for this order');
@@ -436,8 +436,10 @@ function XeroxOrderpreviewtempadmin() {
                     </div>
                     
                     <div className="detail-itemi">
-                      <span className="detail-labeli">Spiral Binding:</span> 
-                      <span className="detail-valuei">{file.spiral ? "Yes" : "No"}</span>
+                      <span className="detail-labeli">Binding:</span> 
+                      <span className="detail-valuei">{file.bindingType && file.bindingType !== 'none'
+                      ? file.bindingType.charAt(0).toUpperCase() + file.bindingType.slice(1)
+                      : "No"}</span>
                     </div>
                   </div>
                   
