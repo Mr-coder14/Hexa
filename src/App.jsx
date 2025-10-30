@@ -47,7 +47,7 @@ import Xeroxorderpreview from "./Components/Xeroxoderpreview";
 import XeroxAllordersmAdmin from "./Components/XeroxAllordersmAdmin";
 import AddProduct from "./Components/AddProduct";
 import Products from "./Components/Products";
-mport ManageUser from "./Components/ManageUser";
+import ManageUser from "./Components/ManageUser";
 import ElectronicProduct from "./Components/ElectronicProduct";
 import ViewProduct from "./Components/ViewProduct";
 
@@ -129,6 +129,19 @@ function Navbar({ user, profileImageUrl }) {
                   <Link to="/xerox" className={getActiveClass("/xerox")}>
                     <i className="bx bx-copy"></i>
                     <span>Xerox</span>
+                  </Link>
+                </li>
+               <li>
+                  <Link to="/ElectronicKit" className={getActiveClass("/ElectronicKit")}>
+                    <i className="bx bx-copy"></i>
+                    <span>Elaectronic Kit</span>
+                  </Link>
+                </li>
+              
+                <li>
+                  <Link to="/books" className={getActiveClass("/books")}>
+                    <i className="bx bx-copy"></i>
+                    <span>Books</span>
                   </Link>
                 </li>
                 {/* Add cart and profile or login and signup links based on auth state */}
@@ -574,7 +587,6 @@ function App() {
           <Route path="manageuser" element={<ManageUser />} />
           <Route path="electronicproduct" element={<ElectronicProduct />} />
           <Route path="viewproduct" element={<ViewProduct />} />
-          
           
           
         </Route>
