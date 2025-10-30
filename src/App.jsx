@@ -131,19 +131,6 @@ function Navbar({ user, profileImageUrl }) {
                     <span>Xerox</span>
                   </Link>
                 </li>
-               <li>
-                  <Link to="/ElectronicKit" className={getActiveClass("/ElectronicKit")}>
-                    <i className="bx bx-copy"></i>
-                    <span>Elaectronic Kit</span>
-                  </Link>
-                </li>
-              
-                <li>
-                  <Link to="/books" className={getActiveClass("/books")}>
-                    <i className="bx bx-copy"></i>
-                    <span>Books</span>
-                  </Link>
-                </li>
                 {/* Add cart and profile or login and signup links based on auth state */}
                 {user ? (
                   <>
