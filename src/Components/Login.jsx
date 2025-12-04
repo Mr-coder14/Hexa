@@ -52,7 +52,7 @@ function Login({ onLogin }) {
         const emailLower = email.toLowerCase();
 
         if (adminEmails.includes(emailLower)) navigate("/admin");
-        else navigate("/xerox"); // Normal user
+       
       }, 1000);
     } catch (error) {
       console.error(error);
