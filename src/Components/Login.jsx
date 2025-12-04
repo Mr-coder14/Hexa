@@ -1,11 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import React, { useState, useEffect } from "react";
-import { auth, database } from "./firebase";
-import {
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-} from "firebase/auth";
-import { ref, onValue, get, set, remove } from "firebase/database";
+import { auth, rtdb as database } from "./firebase"; // Use rtdb
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { ref, get, set, remove, onValue } from "firebase/database";
 import "../css/Login.css";
 
 function Login({ onLogin }) {
@@ -19,74 +16,47 @@ function Login({ onLogin }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
-  
   const admins = ["saleem1712005@gmail.com", "jayaraman00143@gmail.com", "abcd1234@gmail.com"];
   const [tempAdmins, setTempAdmins] = useState([]);
 
   // Fetch temp admins from Firebase on component mount
   useEffect(() => {
     const tempAdminsRef = ref(database, "tempadmin");
-    
     onValue(tempAdminsRef, (snapshot) => {
-      const tempAdminsList = [];
+      const tempAdminsList: string[] = [];
       if (snapshot.exists()) {
-        snapshot.forEach((childSnapshot) => {
-          const tempAdminEmail = childSnapshot.child("email").val();
-          if (tempAdminEmail) {
-            console.log(tempAdminEmail);
-            tempAdminsList.push(tempAdminEmail);
-          }
+        snapshot.forEach((child) => {
+          const tempAdminEmail = child.child("email").val();
+          if (tempAdminEmail) tempAdminsList.push(tempAdminEmail.toLowerCase());
         });
       }
       setTempAdmins(tempAdminsList);
       setLoading(false);
-    }, (error) => {
-      console.error("Error fetching temp admins:", error);
+    }, (err) => {
+      console.error("Error fetching temp admins:", err);
       setLoading(false);
     });
   }, []);
 
-  // Function to migrate user data from users to tempadmin1
-  const migrateUserToTempAdmin = async (userId, userEmail) => {
-    console.log("Attempting to migrate user:", userId, userEmail);
+  const migrateUserToTempAdmin = async (userId: string, userEmail: string) => {
     try {
       const userRef = ref(database, `users/${userId}`);
       const userSnapshot = await get(userRef);
-      
-      if (userSnapshot.exists()) {
-        // Get user data
-        const userData = userSnapshot.val();
-        console.log("User data found:", userData);
-        
-        // Create a new entry in tempadmin1 with the user data
-        const tempAdminRef = ref(database, `tempadmin1/${userId}`);
-        
-        // Make sure email is included in the tempadmin data
-        const tempAdminData = {
-          ...userData,
-          // Ensure email is explicitly included
-        };
-        
-        // Set the data in tempadmin1 node
-        await set(tempAdminRef, tempAdminData);
-        console.log("Data set in tempadmin1:", tempAdminData);
-        
-        // Remove user data from users node
-        await remove(userRef);
-        
-        console.log(`User ${userId} successfully migrated to tempadmin1`);
-        return true;
-      } else {
-        console.log(`User ${userId} not found in users database`);
-        return false;
-      }
+
+      if (!userSnapshot.exists()) return false;
+
+      const userData = userSnapshot.val();
+      const tempAdminRef = ref(database, `tempadmin1/${userId}`);
+      await set(tempAdminRef, { ...userData, email: userEmail });
+      await remove(userRef);
+      return true;
     } catch (error) {
-      console.error("Error migrating user to tempadmin:", error);
+      console.error("Error migrating user to tempadmin1:", error);
       return false;
     }
   };
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email || !password) {
@@ -96,79 +66,53 @@ function Login({ onLogin }) {
       return;
     }
 
-    if (password.length < 6) {
-      setMessage("Incorrect Password");
-      setMessageType("error");
-      setTimeout(() => setMessage(""), 4000);
-      return;
-    }
-
-    
     setMessage("Logging in, please wait...");
     setMessageType("loading");
 
     try {
-      // Authenticate the user
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
-      // Determine user type based on email
+      const emailLower = email.toLowerCase();
+
       let userType = "user";
-      
-      // First check if the email is in the admins list
-      if (admins.includes(email.toLowerCase())) {
+      let userData: any = null;
+
+      // 1️⃣ Admin check
+      if (admins.includes(emailLower)) {
         userType = "admin";
-      } 
-      // Then check if the email is in the tempAdmins list
-      else if (tempAdmins.includes(email.toLowerCase())) {
-        userType = "tempadmin";
-        
-        // For tempadmin, check if user data exists in users node and migrate if needed
-        const migrationResult = await migrateUserToTempAdmin(user.uid, email);
-        if (migrationResult) {
-          console.log("Successfully migrated user data to tempadmin1");
-        } else {
-          console.log("No migration needed or migration failed");
-          
-          // Check if user already exists in tempadmin1
-          const tempAdminRef = ref(database, `tempadmin1/${user.uid}`);
-          const tempAdminSnapshot = await get(tempAdminRef);
-          
-          // If user doesn't exist in tempadmin1, create a new entry
-          if (!tempAdminSnapshot.exists()) {
-            console.log("Creating new entry in tempadmin1");
-            await set(tempAdminRef, {
-              email: email,
-              uid: user.uid,
-              // Add any other default fields you want for temp admins
-            });
-          }
-        }
+        const adminSnap = await get(ref(database, `admins/${user.uid}`));
+        if (adminSnap.exists()) userData = adminSnap.val();
       }
-      
+      // 2️⃣ Temp admin check
+      else if (tempAdmins.includes(emailLower)) {
+        userType = "tempadmin";
+        // Migrate if needed
+        const migrated = await migrateUserToTempAdmin(user.uid, email);
+        const tempAdminSnap = await get(ref(database, `tempadmin1/${user.uid}`));
+        if (tempAdminSnap.exists()) userData = tempAdminSnap.val();
+      }
+      // 3️⃣ Regular user
+      else {
+        const userSnap = await get(ref(database, `users/${user.uid}`));
+        if (userSnap.exists()) userData = userSnap.val();
+      }
+
+      console.log("Fetched user data:", userData);
+
       setMessage("Login Successful! Redirecting...");
       setMessageType("success");
-      
-      // Navigate based on user type
+
       setTimeout(() => {
-        // Only call onLogin if it's a function
-        if (typeof onLogin === 'function') {
-          onLogin();
-        }
-        
-        if (userType === "admin") {
-          navigate("/admin");
-        } else if (userType === "tempadmin") {
-          navigate("/tempadmin");
-        } else {
-          navigate("/xerox"); // Changed from '/xerox' to '/xerox'
-        }
+        if (typeof onLogin === "function") onLogin();
+        if (userType === "admin") navigate("/admin");
+        else if (userType === "tempadmin") navigate("/tempadmin");
+        else navigate("/xerox");
       }, 1000);
-    } catch (error) {
+
+    } catch (error: any) {
+      console.error("Login error:", error);
       if (error.code === "auth/user-not-found" || error.code === "auth/invalid-email") {
         setMessage("Invalid email or password. Please try again.");
-      } else if (error.code === "auth/invalid-credential") {
-        setMessage("Invalid password or Email. Please try again.");
       } else {
         setMessage("Login failed. Please try again.");
       }
@@ -177,9 +121,7 @@ function Login({ onLogin }) {
     }
   };
 
-  const handleForgotPassword = () => {
-    setShowResetModal(true);
-  };
+  const handleForgotPassword = () => setShowResetModal(true);
 
   const handleResetPassword = () => {
     if (!resetEmail) {
@@ -196,22 +138,19 @@ function Login({ onLogin }) {
         setShowResetModal(false);
         setTimeout(() => setMessage(""), 4000);
       })
-      .catch((error) => {
+      .catch(() => {
         setMessage("Unable to send, failed");
         setMessageType("error");
         setTimeout(() => setMessage(""), 4000);
       });
   };
 
-  if (loading) {
-    return <div className="loadingloginl">Loading...</div>;
-  }
+  if (loading) return <div className="loadingloginl">Loading...</div>;
 
   return (
     <div className="loginboxloginl">
       <form className="loginbox1loginl" onSubmit={handleLogin}>
         <h2 className="loginh1loginl">Login</h2>
-
         <input
           className="logininputloginl"
           type="email"
@@ -220,7 +159,6 @@ function Login({ onLogin }) {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-
         <div className="password-containerloginl">
           <input
             className="logininputloginl"
@@ -231,40 +169,25 @@ function Login({ onLogin }) {
             required
           />
         </div>
-
         <div className="showloginl">
           <label className="show-passwordloginl">
             <input
               type="checkbox"
               checked={showPassword}
               onChange={(e) => setShowPassword(e.target.checked)}
-            />
-            Show Password
+            /> Show Password
           </label>
           <p className="forgotpasswordlinkloginl" onClick={handleForgotPassword}>
             Forgot Password?
           </p>
         </div>
-
-        <button type="submit" className="loginbuttonloginl">
-          Login
-        </button>
-
-        {/* {message && (
-          <div className={`loginmessageloginl ${messageType}`}>{message}</div>
-        )} */}
-
+        <button type="submit" className="loginbuttonloginl">Login</button>
         <p className="signup-linkloginl">
           Don't have an account?
           <span
             className="signup-textloginl"
             onClick={() => navigate("/signup")}
-            style={{
-              color: "blue",
-              cursor: "pointer",
-              textDecoration: "underline",
-              fontSize: "16px",
-            }}
+            style={{ color: "blue", cursor: "pointer", textDecoration: "underline", fontSize: "16px" }}
           >
             Create Account
           </span>
@@ -283,15 +206,8 @@ function Login({ onLogin }) {
               className="reset-email-inputloginl"
             />
             <div className="reset-buttonsloginl">
-              <button className="reset-buttonloginl" onClick={handleResetPassword}>
-                Reset
-              </button>
-              <button
-                className="cancel-buttonloginl"
-                onClick={() => setShowResetModal(false)}
-              >
-                Cancel
-              </button>
+              <button className="reset-buttonloginl" onClick={handleResetPassword}>Reset</button>
+              <button className="cancel-buttonloginl" onClick={() => setShowResetModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
